@@ -3,7 +3,6 @@ package hdrwatch
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -121,11 +120,9 @@ func (sc *SearchController) Search(searchString string) torrentAPIResponse {
 	sc.Token = GetToken()
 	url := sc.createSearchURL(searchString)
 	sc.waitForNextAPIWindow()
-	fmt.Println(url)
 
 	response := httpCall(url)
-	fmt.Println(response)
-
+	
 	target := torrentAPIResponse{}
 	json.NewDecoder(bytes.NewReader(response)).Decode(&target)
 
@@ -135,7 +132,6 @@ func (sc *SearchController) Search(searchString string) torrentAPIResponse {
 func (sc *SearchController) SearchInCategory(searchString string, category int) torrentAPIResponse {
 	sc.Category = category
 	r := sc.Search(searchString)
-	fmt.Println(r)
 	return r
 }
 
