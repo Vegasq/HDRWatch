@@ -3,6 +3,7 @@ package hdrwatch
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -65,13 +66,14 @@ func (sc *SearchController) createSearchURL(searchString string) string {
 
 	q := req.URL.Query()
 
+	q.Add("mode", "search")
 	q.Add("search_string", searchString)
 	q.Add("app_id", "hdr_watch")
 	q.Add("category", strconv.Itoa(sc.Category))
 	q.Add("token", sc.Token)
 	q.Add("min_seeders", "1")
-	q.Add("min_leechers", "1")
-	q.Add("limit", "100")
+	q.Add("min_leechers", "0")
+	//q.Add("limit", "100")
 	q.Add("format", "json_extended")
 	q.Add("ranked", "0")
 	req.URL.RawQuery = q.Encode()
@@ -119,10 +121,11 @@ func ToTable(target torrentAPIResponse) [][]string {
 func (sc *SearchController) Search(searchString string) torrentAPIResponse {
 	sc.Token = GetToken()
 	url := sc.createSearchURL(searchString)
+	fmt.Println(url)
 	sc.waitForNextAPIWindow()
 
 	response := httpCall(url)
-	
+
 	target := torrentAPIResponse{}
 	json.NewDecoder(bytes.NewReader(response)).Decode(&target)
 
