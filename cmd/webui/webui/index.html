@@ -1,0 +1,78 @@
+<style>
+html, body {
+    background-color: rgb(87, 87, 87);
+}
+#content > div {
+    float: left;
+    width: 220px;
+    height: 375px;
+    overflow: hidden;
+    margin: 10px;
+    border: 2px black solid;
+
+    text-align: center;
+    line-height: 50px;
+}
+#content > div > img {
+    width: 220px;
+    height: 325px;
+}
+#content > div > a {
+    text-decoration: none;
+    color: white;
+}
+</style>
+
+<script>
+
+function http_get(url, callback){
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open("GET", url);
+
+    xmlHttp.onreadystatechange = function () {
+        if(xmlHttp.readyState === 4 && xmlHttp.status === 200) {
+            var data = JSON.parse(xmlHttp.responseText);
+            callback(data);
+        }
+    };
+
+    xmlHttp.send(null);
+}
+
+function refresh_releases(){
+    var url = "/v1/getHDRReleases";
+    var data = http_get(url, display_releases);
+    console.log(data);
+}
+
+function display_releases(response){
+    document.getElementById("content").innerHTML = "";
+    for(ri = 1; ri < response.length; ri++) {
+        var card = create_movie_card(response[ri]);
+        document.getElementById("content").appendChild(card);
+    }
+}
+
+function create_movie_card(movie){
+    var div = document.createElement("div");
+
+    var img = document.createElement("img");
+    img.src = "http://localhost:5000/" + movie[0] + "/" + movie[1];
+    div.appendChild(img);
+
+    var title = document.createElement("a");
+    title.text = movie[0];
+    title.href = movie[5];
+    title.title = movie[4];
+    div.appendChild(title);
+    
+    return div;
+}
+
+window.onload = function () {
+    refresh_releases();
+}
+
+</script>
+
+<div id="content">Loading...</div>

@@ -1,4 +1,4 @@
-package main
+package hdrwatch
 
 import (
 	"encoding/json"
@@ -71,8 +71,14 @@ func (tc *tokenController) auth() {
 	}
 }
 
-// GetToken return torrentapi token as a string value
+// getToken return torrentapi token as a string value
 func (tc *tokenController) GetToken() string {
 	tc.auth()
 	return tc.TokenValue
+}
+
+
+func GetToken() string {
+	tc := tokenController{}
+	return tc.GetToken()
 }

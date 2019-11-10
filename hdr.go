@@ -1,7 +1,10 @@
-package main
+package hdrwatch
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -11,9 +14,6 @@ import (
 	"github.com/vegasq/GoPrintTable"
 )
 
-// import "io/ioutil"
-
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 type torrentAPIResponse struct {
 	TorrentResults []Movie `json:"torrent_results"`
@@ -37,21 +37,25 @@ type Movie struct {
 
 type SearchController struct {
 	Tick time.Time
+	Token string
+	Category int
 }
 
-func (sc *SearchController) canIMakeApiCall() bool {
-	currentTime := time.Now().Local()
-	tickTimePlus := sc.Tick.Add(time.Second * time.Duration(3))
+func (sc *SearchController) waitForNextAPIWindow() {
+	for i := 0; i < 3; i++ {
+		currentTime := time.Now().Local()
+		tickTimePlus := sc.Tick.Add(time.Second * time.Duration(3))
 
-	if currentTime.After(tickTimePlus) {
-		sc.Tick = currentTime
-		return true
+		if currentTime.After(tickTimePlus) {
+			sc.Tick = currentTime
+			return
+		}
+
+		time.Sleep(1 * time.Second)
 	}
-
-	return false
 }
 
-func (sc *SearchController) createSearchURL(searchString string, token string) string {
+func (sc *SearchController) createSearchURL(searchString string) string {
 	url := "https://torrentapi.org/pubapi_v2.php"
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -64,8 +68,8 @@ func (sc *SearchController) createSearchURL(searchString string, token string) s
 
 	q.Add("search_string", searchString)
 	q.Add("app_id", "hdr_watch")
-	q.Add("category", "52")
-	q.Add("token", token)
+	q.Add("category", strconv.Itoa(sc.Category))
+	q.Add("token", sc.Token)
 	q.Add("min_seeders", "1")
 	q.Add("min_leechers", "1")
 	q.Add("limit", "100")
@@ -76,16 +80,7 @@ func (sc *SearchController) createSearchURL(searchString string, token string) s
 	return req.URL.String()
 }
 
-func (sc *SearchController) Search(searchString string) [][]string {
-	tc := tokenController{}
-
-	token := tc.GetToken()
-	url := sc.createSearchURL(searchString, token)
-	log.Print(url)
-
-	// Wait for API
-	for sc.canIMakeApiCall() == false {
-	}
+func httpCall(url string) []byte {
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Print(err)
@@ -95,10 +90,15 @@ func (sc *SearchController) Search(searchString string) [][]string {
 	if resp.StatusCode != http.StatusOK {
 		log.Fatal("Incorrect return code from ", url, " Code: ", resp.StatusCode)
 	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
 
-	target := new(torrentAPIResponse)
-	json.NewDecoder(resp.Body).Decode(target)
+	return data
+}
 
+func ToTable(target torrentAPIResponse) [][]string {
 	tbl := [][]string{}
 	tbl = append(tbl, []string{"Movie", "Year", "Seeders", "Released", "Tags", "Download"})
 	for _, movie := range target.TorrentResults {
@@ -115,21 +115,32 @@ func (sc *SearchController) Search(searchString string) [][]string {
 	GoPrintTable.PrintTableWithHeader(tbl)
 
 	return tbl
-
-	// responseData, err := ioutil.ReadAll(resp.Body)
-	// log.Print("responseData: ", responseData)
-	// log.Print("resp.StatusCode: ", resp.StatusCode)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// return string(responseData)
-
 }
 
-// func main2() {
-// 	sc := SearchController{}
-// 	sc.Tick = time.Now().Local()
+func (sc *SearchController) Search(searchString string) torrentAPIResponse {
+	sc.Token = GetToken()
+	url := sc.createSearchURL(searchString)
+	sc.waitForNextAPIWindow()
+	fmt.Println(url)
 
-// 	sc.Search("")
-// }
+	response := httpCall(url)
+	fmt.Println(response)
+
+	target := torrentAPIResponse{}
+	json.NewDecoder(bytes.NewReader(response)).Decode(&target)
+
+	return target
+}
+
+func (sc *SearchController) SearchInCategory(searchString string, category int) torrentAPIResponse {
+	sc.Category = category
+	r := sc.Search(searchString)
+	fmt.Println(r)
+	return r
+}
+
+func Search(searchFor string) torrentAPIResponse {
+	sc := SearchController{}
+	sc.Tick = time.Now().Local()
+	return sc.Search(searchFor)
+}
